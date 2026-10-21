@@ -1,0 +1,7 @@
+sample	condition
+CD6Shoot1	CD6
+CD6Shoot2	CD6
+CD6Shoot3	CD6
+ControlShoot1	Control
+ControlShoot2	Control
+ControlShoot3	Control

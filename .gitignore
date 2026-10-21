@@ -1,0 +1,29 @@
+# Raw sequencing data
+*.fastq
+*.fastq.gz
+*.fq
+*.fq.gz
+
+# Large alignment files
+*.bam
+*.bai
+*.cram
+*.crai
+*.sam
+
+# Workflow intermediates
+cromwell-executions/
+call-caching/
+star_index/
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+.Rhistory
+.RData
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
