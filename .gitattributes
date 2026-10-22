@@ -1,2 +1,13 @@
 *.html linguist-generated
 qc/multiqc_report_data.zip linguist-generated
+# Exclude generated reports and analysis outputs
+*.html linguist-generated
+*.pdf linguist-generated
+*.zip linguist-generated
+*.csv linguist-generated
+*.txt linguist-generated
+*.log linguist-generated
+*.bam linguist-generated
+*.bai linguist-generated
+*.fastq linguist-generated
+*.fastq.gz linguist-generated
