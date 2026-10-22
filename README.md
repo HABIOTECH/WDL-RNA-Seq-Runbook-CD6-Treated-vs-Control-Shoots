@@ -5,15 +5,13 @@
 
 ## Research team: 
 
-Collaborative Project: Horizon Science Communication LLC × University of Massachusetts
+This project was conducted through a collaboration between Horizon Science Communication LLC and the University of Massachusetts, USA and National Research Center, Egypt.
 
-This project was conducted through a collaboration between Horizon Science Communication LLC and the University of Massachusetts.
 
 Horizon Science Communication LLC — Bioinformatics Team:
 
-- **Dr. Hesham Abdullah**
-
-> **Important reference check:** The downloaded assembly `GCF_000004075.2_ASM407v2` is identified by NCBI as *Cucumis sativus* (cucumber). Confirm that the RNA-Seq reads are from cucumber before interpreting mapping or differential-expression results. If the reads are from another species, replace the reference FASTA and annotation before running the workflow.
+- **Hesham Abdullah, PhD**
+- **Alaa El-minisy, PhD**
 
 ## Table of contents
 
