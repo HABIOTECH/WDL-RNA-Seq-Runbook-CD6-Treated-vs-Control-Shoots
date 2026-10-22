@@ -3,7 +3,42 @@
 <img width="1672" height="941" alt="Image" src="https://github.com/user-attachments/assets/072accc5-62a6-42a4-815d-3b9c59fc69a0" />
 
 
-## 1. Purpose
+## Research team: 
+
+Collaborative Project: Horizon Science Communication LLC × University of Massachusetts
+
+This project was conducted through a collaboration between Horizon Science Communication LLC and the University of Massachusetts.
+
+Horizon Science Communication LLC — Bioinformatics Team:
+
+- **Dr. Hesham Abdullah**
+
+> **Important reference check:** The downloaded assembly `GCF_000004075.2_ASM407v2` is identified by NCBI as *Cucumis sativus* (cucumber). Confirm that the RNA-Seq reads are from cucumber before interpreting mapping or differential-expression results. If the reads are from another species, replace the reference FASTA and annotation before running the workflow.
+
+## Table of contents
+
+- [Project overview](#project-overview)
+- [Project objectives](#project-objectives)
+- [Dataset overview](#dataset-overview)
+- [Why WDL, Cromwell, and SLURM?](#why-wdl-cromwell-and-slurm)
+- [Workflow overview](#workflow-overview)
+- [Repository structure](#repository-structure)
+- [Highlights](#highlights)
+- [Results showcase](#results-showcase)
+- [Software environment](#software-environment)
+- [Running the workflow](#running-the-workflow)
+- [WDL workflow stages](#wdl-workflow-stages)
+- [Expected outputs](#expected-outputs)
+- [Interpreting results](#interpreting-results)
+- [Experimental design notes](#experimental-design-notes)
+- [Troubleshooting](#troubleshooting)
+- [Reusable preflight check](#reusable-preflight-check)
+- [Future runs](#future-runs)
+- [Successful run and output locations](#successful-run-and-output-locations)
+- [Packaging and archiving results](#packaging-and-archiving-results)
+- [Completion checklist](#completion-checklist)
+
+## Project overview
 
 This runbook documents the complete bulk RNA-Seq workflow for comparing:
 
@@ -19,61 +54,15 @@ The workflow is executed with [`ww-rnaseq.wdl`](https://github.com/HABIOTECH/wil
 
 ---
 
-## 2. Portable project variables
+## Project objectives
 
-Set these variables once per project. Replace only the right-hand values; the rest of this README uses the variables so it can be committed to GitHub without exposing site-specific paths.
+The objective is to compare gene expression between CD6-treated and untreated control shoots using six paired-end RNA-seq libraries, with DESeq2 configured for the `CD6 - Control` contrast and a `~ condition` design.
 
-```bash
-export PROJECT_ROOT="/path_to_folder/wilds-wdl-library/pipelines/ww-rnaseq"
-export DATA_ROOT="/path_to_folder/OS_genome_data"
-export REFERENCE_ROOT="${DATA_ROOT}/Reference_genome"
-export BIN_ROOT="/path_to_folder/bin"
-export CONDA_ROOT="/path_to_folder/miniconda"
-export RESULTS_ROOT="/path_to_folder/results"
+The WDL workflow source is maintained in the [WILDS WDL library RNA-seq pipeline](https://github.com/HABIOTECH/wilds-wdl-library/tree/main/pipelines/ww-rnaseq). This repository also contains the standalone DESeq2 analysis script and selected input data, QC reports, result tables, and figures. Confirm that all external workflow files and environment-specific configuration are available before attempting a fresh end-to-end run.
 
-export REF_FASTA="${REFERENCE_ROOT}/GCF_000004075.2_ASM407v2_genomic.fna"
-export REF_GTF="${REFERENCE_ROOT}/GCF_000004075.2_ASM407v2_genomic.gtf"
-export SAMPLES_TSV="${DATA_ROOT}/samples.tsv"
-```
+## Dataset overview
 
-`/path_to_folder` is a placeholder. On a real HPCC account, replace it with the directory where the pipeline, data, tools, and Conda installation are stored. Do not commit credentials, passwords, or institution-specific access instructions to the repository.
-
-## 3. Project locations
-
-### Pipeline
-
-```bash
-${PROJECT_ROOT}
-```
-
-### FASTQ data
-
-```bash
-${DATA_ROOT}
-```
-
-### Reference directory
-
-```bash
-${REFERENCE_ROOT}
-```
-
-### Custom tools
-
-```bash
-${BIN_ROOT}
-```
-
-### Conda environments
-
-```bash
-${CONDA_ROOT}/envs/rnaseq_r
-${CONDA_ROOT}/envs/multiqc_env
-```
-
----
-
-## 4. Input samples
+### Input samples
 
 The six libraries are:
 
@@ -90,7 +79,7 @@ Each paired FASTQ pair represents one biological library. Read 1 and read 2 must
 
 ---
 
-## 5. Create the tab-delimited sample sheet
+### Create the tab-delimited sample sheet
 
 The WDL reads the sample sheet with `read_tsv`, so the file must contain real tab characters. Generate it with Python rather than manually spacing columns:
 
@@ -200,63 +189,112 @@ done < "${DATA_ROOT}/samples.tsv"
 
 ---
 
-## 6. Reference genome and annotation
+## Why WDL, Cromwell, and SLURM?
 
-The pipeline requires:
+WDL describes the workflow tasks and dependencies, Cromwell executes and tracks the workflow, and the SLURM backend submits individual tasks to the HPC scheduler. This separates workflow logic from cluster scheduling and supports reproducible, resource-configured execution.
 
-- Genome FASTA: `GCF_000004075.2_ASM407v2_genomic.fna`
-- Gene annotation: `GCF_000004075.2_ASM407v2_genomic.gtf`
+The pipeline covers reference-annotation preparation, read-level QC, adapter trimming, STAR alignment, alignment QC with RSeQC, count-matrix assembly, DESeq2 analysis, result compilation, MultiQC aggregation, and optional output organization.
 
-The corresponding compressed files can be downloaded from NCBI:
+## Workflow overview
 
-```bash
-mkdir -p ${DATA_ROOT}/Reference_genome
-cd ${DATA_ROOT}/Reference_genome
-
-wget https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/004/075/GCF_000004075.2_ASM407v2/GCF_000004075.2_ASM407v2_genomic.fna.gz
-wget https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/004/075/GCF_000004075.2_ASM407v2/GCF_000004075.2_ASM407v2_genomic.gtf.gz
-
-gunzip -k GCF_000004075.2_ASM407v2_genomic.fna.gz
-gunzip -k GCF_000004075.2_ASM407v2_genomic.gtf.gz
+```text
+Paired-end FASTQ files + sample sheet + reference FASTA/GTF
+                         |
+                         v
+                 GTF normalization
+                         |
+                         v
+               Pre-trim FastQC
+                         |
+                         v
+                Adapter trimming
+                         |
+                         v
+               Post-trim FastQC
+                         |
+                         v
+                STAR alignment
+                         |
+                         v
+                  RSeQC QC
+                         |
+                         v
+            Count matrix + metadata
+                         |
+                         v
+                 DESeq2 analysis
+                         |
+                         v
+          Compiled results + MultiQC
+                         |
+                         v
+             Organized result outputs
 ```
 
-The `-k` option preserves the compressed originals.
+The detailed task descriptions, expected files, and execution notes are retained in the **WDL workflow stages** and **Expected outputs** sections below.
 
-Set reference paths:
+## Repository structure
 
-```bash
-export REF_FASTA="${DATA_ROOT}/Reference_genome/GCF_000004075.2_ASM407v2_genomic.fna"
-export REF_GTF="${DATA_ROOT}/Reference_genome/GCF_000004075.2_ASM407v2_genomic.gtf"
+The committed repository is organized around the analysis inputs, script, QC reports, and results:
+
+```text
+WDL-RNA-Seq-Runbook-CD6-Treated-vs-Control-Shoots/
+├── README.md
+├── .gitignore
+├── data/
+│   ├── combined_counts_matrix.txt
+│   ├── sample_metadata.txt
+│   └── reference/
+│       └── normalized.gtf
+├── scripts/
+│   └── deseq2_analysis.R
+├── qc/
+│   ├── multiqc_report.html
+│   └── multiqc_report_data.zip
+└── results/
+    ├── differential_expression/
+    │   ├── cd6_vs_control_all_genes.csv
+    │   ├── cd6_vs_control_normalized_counts.csv
+    │   ├── cd6_vs_control_significant.csv
+    │   └── additional DESeq2 result tables
+    └── figures/
+        ├── cd6_vs_control_heatmap.pdf
+        ├── cd6_vs_control_ma_plot.pdf
+        ├── cd6_vs_control_pca.pdf
+        └── cd6_vs_control_volcano.pdf
 ```
 
-Check readability:
+The full WDL source, Cromwell configuration, and input JSON are referenced in the runbook but are not shown in the committed file tree above. The WDL source is linked in the project objectives section; cluster-specific configuration and file paths must be supplied for a new HPC run.
 
-```bash
-test -r "$REF_FASTA" || { echo "Cannot read FASTA"; exit 1; }
-test -r "$REF_GTF" || { echo "Cannot read GTF"; exit 1; }
+## Highlights
 
-ls -lh "$REF_FASTA" "$REF_GTF"
-```
+- Six biological libraries: three CD6-treated and three Control shoot samples.
+- Paired-end FASTQ input and a tab-delimited sample manifest.
+- WDL orchestration through Cromwell with SLURM task submission.
+- Read QC before and after adapter trimming.
+- STAR alignment and RSeQC alignment-quality assessment.
+- DESeq2 differential-expression testing for `condition,CD6,Control`.
+- MultiQC reporting and optional organization of delivery-ready outputs.
+- A standalone R script and selected results are included for reviewing the DESeq2 analysis separately from the full WDL workflow.
 
-Create a FASTA index:
+## Results showcase
 
-```bash
-module load samtools/1.21
-samtools faidx "$REF_FASTA"
-```
+The committed analysis outputs include the differential-expression tables and four principal visualizations:
 
-Check chromosome/contig naming consistency:
+| Output | File |
+|---|---|
+| All-gene differential-expression results | [`cd6_vs_control_all_genes.csv`](results/differential_expression/cd6_vs_control_all_genes.csv) |
+| Normalized counts | [`cd6_vs_control_normalized_counts.csv`](results/differential_expression/cd6_vs_control_normalized_counts.csv) |
+| Significant results | [`cd6_vs_control_significant.csv`](results/differential_expression/cd6_vs_control_significant.csv) |
+| PCA | [`cd6_vs_control_pca.pdf`](results/figures/cd6_vs_control_pca.pdf) |
+| Heatmap | [`cd6_vs_control_heatmap.pdf`](results/figures/cd6_vs_control_heatmap.pdf) |
+| MA plot | [`cd6_vs_control_ma_plot.pdf`](results/figures/cd6_vs_control_ma_plot.pdf) |
+| Volcano plot | [`cd6_vs_control_volcano.pdf`](results/figures/cd6_vs_control_volcano.pdf) |
+| MultiQC report | [`multiqc_report.html`](qc/multiqc_report.html) |
 
-```bash
-cut -f1 "$REF_GTF" | grep -v '^#' | sort -u | head
-head "$REF_FASTA.fai"
-```
+The committed standalone DESeq2 run retained 18,222 genes after filtering and reported 8,024 genes with adjusted p-value below 0.05. These values should be interpreted only after confirming the organism/reference identity, sample-level QC, replicate relationships, and the assumptions described later in this README.
 
-The FASTA and GTF must use matching sequence names. For example, `Chr1` and `1` are different names to STAR.
-
----
-
-## 7. Software environment
+## Software environment
 
 The final working environment uses:
 
@@ -325,7 +363,374 @@ Expected results include R 4.5.3 and DESeq2 1.50.2.
 
 ---
 
-## 8. WDL workflow stages and purpose
+## Running the workflow
+
+### Quick start: standalone DESeq2 analysis
+
+The repository includes `scripts/deseq2_analysis.R` so the differential-expression analysis can be run separately from the full WDL/Cromwell workflow. Activate an R environment that contains DESeq2 and the script's required packages, then run from the repository root:
+
+```bash
+"$CONDA_PREFIX/bin/Rscript" scripts/deseq2_analysis.R \\
+  --counts_file data/combined_counts_matrix.txt \\
+  --metadata_file data/sample_metadata.txt \\
+  --condition_column condition \\
+  --reference_level Control \\
+  --contrast condition,CD6,Control \\
+  --output_prefix results/differential_expression/cd6_vs_control \\
+  --min_counts 10
+```
+
+This standalone command starts from the combined count matrix and sample metadata. It does not execute the upstream FASTQ QC, trimming, alignment, or count-generation stages. Those stages require the WDL source, Cromwell configuration, input JSON, reference files, and cluster-specific setup described below.
+
+### Portable project variables
+
+Set these variables once per project. Replace only the right-hand values; the rest of this README uses the variables so it can be committed to GitHub without exposing site-specific paths.
+
+```bash
+export PROJECT_ROOT="/path_to_folder/wilds-wdl-library/pipelines/ww-rnaseq"
+export DATA_ROOT="/path_to_folder/OS_genome_data"
+export REFERENCE_ROOT="${DATA_ROOT}/Reference_genome"
+export BIN_ROOT="/path_to_folder/bin"
+export CONDA_ROOT="/path_to_folder/miniconda"
+export RESULTS_ROOT="/path_to_folder/results"
+
+export REF_FASTA="${REFERENCE_ROOT}/GCF_000004075.2_ASM407v2_genomic.fna"
+export REF_GTF="${REFERENCE_ROOT}/GCF_000004075.2_ASM407v2_genomic.gtf"
+export SAMPLES_TSV="${DATA_ROOT}/samples.tsv"
+```
+
+`/path_to_folder` is a placeholder. On a real HPCC account, replace it with the directory where the pipeline, data, tools, and Conda installation are stored. Do not commit credentials, passwords, or institution-specific access instructions to the repository.
+
+### Project locations
+
+### Pipeline
+
+```bash
+${PROJECT_ROOT}
+```
+
+### FASTQ data
+
+```bash
+${DATA_ROOT}
+```
+
+### Reference directory
+
+```bash
+${REFERENCE_ROOT}
+```
+
+### Custom tools
+
+```bash
+${BIN_ROOT}
+```
+
+### Conda environments
+
+```bash
+${CONDA_ROOT}/envs/rnaseq_r
+${CONDA_ROOT}/envs/multiqc_env
+```
+
+---
+
+### Reference genome and annotation
+
+The pipeline requires:
+
+- Genome FASTA: `GCF_000004075.2_ASM407v2_genomic.fna`
+- Gene annotation: `GCF_000004075.2_ASM407v2_genomic.gtf`
+
+The corresponding compressed files can be downloaded from NCBI:
+
+```bash
+mkdir -p ${DATA_ROOT}/Reference_genome
+cd ${DATA_ROOT}/Reference_genome
+
+wget https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/004/075/GCF_000004075.2_ASM407v2/GCF_000004075.2_ASM407v2_genomic.fna.gz
+wget https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/004/075/GCF_000004075.2_ASM407v2/GCF_000004075.2_ASM407v2_genomic.gtf.gz
+
+gunzip -k GCF_000004075.2_ASM407v2_genomic.fna.gz
+gunzip -k GCF_000004075.2_ASM407v2_genomic.gtf.gz
+```
+
+The `-k` option preserves the compressed originals.
+
+Set reference paths:
+
+```bash
+export REF_FASTA="${DATA_ROOT}/Reference_genome/GCF_000004075.2_ASM407v2_genomic.fna"
+export REF_GTF="${DATA_ROOT}/Reference_genome/GCF_000004075.2_ASM407v2_genomic.gtf"
+```
+
+Check readability:
+
+```bash
+test -r "$REF_FASTA" || { echo "Cannot read FASTA"; exit 1; }
+test -r "$REF_GTF" || { echo "Cannot read GTF"; exit 1; }
+
+ls -lh "$REF_FASTA" "$REF_GTF"
+```
+
+Create a FASTA index:
+
+```bash
+module load samtools/1.21
+samtools faidx "$REF_FASTA"
+```
+
+Check chromosome/contig naming consistency:
+
+```bash
+cut -f1 "$REF_GTF" | grep -v '^#' | sort -u | head
+head "$REF_FASTA.fai"
+```
+
+The FASTA and GTF must use matching sequence names. For example, `Chr1` and `1` are different names to STAR.
+
+---
+
+### Input JSON
+
+The production input file is `inputs_cd6_vs_control.json`.
+
+A suitable configuration is:
+
+```json
+{
+  "rnaseq.samples_tsv": "/path_to_folder/OS_genome_data/samples.tsv",
+  "rnaseq.reference_genome": {
+    "name": "Cucumis_sativus_ASM407v2",
+    "fasta": "/path_to_folder/OS_genome_data/Reference_genome/GCF_000004075.2_ASM407v2_genomic.fna",
+    "gtf": "/path_to_folder/OS_genome_data/Reference_genome/GCF_000004075.2_ASM407v2_genomic.gtf"
+  },
+  "rnaseq.reference_level": "Control",
+  "rnaseq.contrast": "condition,CD6,Control",
+  "rnaseq.trim_quality": 20,
+  "rnaseq.trim_length": 20,
+  "rnaseq.star_cpu": 8,
+  "rnaseq.star_memory_gb": 64,
+  "rnaseq.genome_sa_index_nbases": 14,
+  "rnaseq.min_counts": 10,
+  "rnaseq.min_samples": 0,
+  "rnaseq.organize_results": true,
+  "rnaseq.include_bams": false,
+  "rnaseq.include_trimmed_fastqs": false
+}
+```
+
+Validate JSON syntax:
+
+```bash
+python3 -m json.tool inputs_cd6_vs_control.json
+```
+
+---
+
+### WDL validation
+
+Womtool and Cromwell 87 require Java 11. Java 8 produces a class-version error.
+
+Load Java 11:
+
+```bash
+module load java/11.0.2
+hash -r
+java -version
+```
+
+Validate the WDL:
+
+```bash
+java -jar ${BIN_ROOT}/womtool-87.jar \
+  validate \
+  ww-rnaseq.wdl
+```
+
+Validate the WDL with the input JSON:
+
+```bash
+java -jar ${BIN_ROOT}/womtool-87.jar \
+  validate \
+  ww-rnaseq.wdl \
+  --inputs inputs_cd6_vs_control.json
+```
+
+Expected result:
+
+```text
+Success!
+```
+
+Cromwell 87 does not provide a `validate` subcommand. Use Womtool for validation.
+
+---
+
+### Cromwell SLURM configuration
+
+The active `slurm.conf` submits each WDL task as a separate SLURM job. It uses `--parsable` so Cromwell receives a numeric SLURM job ID directly.
+
+```hocon
+include classpath("application")
+
+backend {
+  default = "SLURM"
+
+  providers {
+    SLURM {
+      actor-factory = "cromwell.backend.impl.sfs.config.ConfigBackendLifecycleActorFactory"
+
+      config {
+        concurrent-job-limit = 10
+
+        runtime-attributes = """
+        Int cpu = 8
+        Int memory_gb = 64
+        String partition = "general"
+        """
+
+        submit = """
+          /usr/bin/sbatch --parsable \
+            -J \${job_name} \
+            -D \${cwd} \
+            -o \${out} \
+            -e \${err} \
+            -t 24:00:00 \
+            --partition=\${partition} \
+            --cpus-per-task=\${cpu} \
+            --mem=\${memory_gb}G \
+            --wrap "source /etc/profile.d/modules.sh 2>/dev/null || true; module load fastqc/0.11.5 star/2.7.3a subread/2.0.5 samtools/1.21 cutadapt/2.1 bedtools/2.27.1; source /path_to_folder/miniconda/etc/profile.d/conda.sh; conda activate rnaseq_r; unset R_HOME R_LIBS_USER R_LIBS PYTHONHOME PYTHONPATH; export PATH=/path_to_folder/miniconda/envs/multiqc_env/bin:/path_to_folder/miniconda/envs/rnaseq_r/bin:/path_to_folder/bin:\$PATH; exec /bin/bash \${script}"
+        """
+
+        kill = "scancel ${job_id}"
+        check-alive = "squeue -j ${job_id}"
+        job-id-regex = "(\\d+)"
+      }
+    }
+  }
+}
+```
+
+Important configuration details:
+
+- Do not use `--wait` in the Cromwell `submit` command.
+- Use `/usr/bin/sbatch --parsable`.
+- Use `job-id-regex = "(\\d+)"`.
+- Do not load system R 3.6.1 or R 4.6.0 for child tasks.
+- Activate `rnaseq_r` so R 4.5.3 and DESeq2 1.50.2 are used.
+- Modern RSeQC 5.0.5 and MultiQC 1.35 come from `multiqc_env`; do not load the obsolete Python 2 `RSeQC/2.6.3` module.
+- Keep the escaped Cromwell variables inside the triple-quoted HOCON `submit` template exactly as shown.
+- Do not run `${script}` directly in an interactive shell; Cromwell provides that value when it creates a task.
+
+---
+
+### Cromwell master submission script
+
+The master Cromwell process itself runs as a small SLURM job. It does not need to activate the RNA-Seq R environment; child tasks activate `rnaseq_r` through `slurm.conf`.
+
+```bash
+#!/bin/bash
+#SBATCH --job-name=Cromwell_Master
+#SBATCH --partition=general
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=2
+#SBATCH --mem=8G
+#SBATCH --time=48:00:00
+#SBATCH --output=cromwell_master_%j.log
+
+set -euo pipefail
+
+source /etc/profile.d/modules.sh 2>/dev/null || true
+module load java/11.0.2
+
+cd ${PROJECT_ROOT}
+
+java \
+  -Dconfig.file=${PROJECT_ROOT}/slurm.conf \
+  -jar ${BIN_ROOT}/cromwell-87.jar \
+  run \
+  ${PROJECT_ROOT}/ww-rnaseq.wdl \
+  --inputs ${PROJECT_ROOT}/inputs_cd6_vs_control.json
+```
+
+Submit:
+
+```bash
+cd ${PROJECT_ROOT}
+sbatch submit_pipeline.sh
+```
+
+---
+
+### Monitor a run
+
+Find active jobs:
+
+```bash
+squeue -u "$USER" \
+  -o "%.18i %.12P %.30j %.8T %.10M %.10l %.20R"
+```
+
+Typical output includes:
+
+- One `Cromwell_Master` job
+- Multiple `cromwell_*` child jobs
+- FastQC and Trim Galore jobs running in parallel
+- Later STAR and RSeQC jobs
+
+Follow the master log using the actual master job ID:
+
+```bash
+tail -f cromwell_master_1229509.log
+```
+
+Replace `1229509` with the actual ID. Do not type a placeholder such as `<NEW_JOB_ID>` literally.
+
+Stop viewing the log with `Ctrl+C`; this does not stop the SLURM job.
+
+Search for task errors:
+
+```bash
+grep -nEi \
+  'error|failed|failure|exception|command not found|out.of.memory|oom' \
+  cromwell_master_<MASTER_JOB_ID>.log | tail -n 50
+```
+
+Find the execution directories:
+
+```bash
+find cromwell-executions/rnaseq -maxdepth 1 -mindepth 1 -type d \
+  -printf '%f\n' | sort | tail -n 10
+```
+
+For a known workflow UUID:
+
+```bash
+RUN="cromwell-executions/rnaseq/<WORKFLOW_UUID>"
+
+find "$RUN" -type f -name rc -print0 |
+while IFS= read -r -d '' f
+ do
+    printf '%s: ' "$f"
+    cat "$f"
+done
+```
+
+Return-code interpretation:
+
+| Return code | Meaning |
+|---:|---|
+| `0` | Task succeeded |
+| `127` | Executable not found |
+| `137` | Often out-of-memory or killed task |
+| Other nonzero value | Tool- or task-specific failure |
+
+---
+
+## WDL workflow stages
 
 The workflow is `rnaseq` in `ww-rnaseq.wdl`.
 
@@ -575,245 +980,9 @@ When `organize_results = true`, this task creates a clean numbered directory str
 
 ---
 
-## 9. Input JSON
+## Expected outputs
 
-The production input file is `inputs_cd6_vs_control.json`.
-
-A suitable configuration is:
-
-```json
-{
-  "rnaseq.samples_tsv": "/path_to_folder/OS_genome_data/samples.tsv",
-  "rnaseq.reference_genome": {
-    "name": "Cucumis_sativus_ASM407v2",
-    "fasta": "/path_to_folder/OS_genome_data/Reference_genome/GCF_000004075.2_ASM407v2_genomic.fna",
-    "gtf": "/path_to_folder/OS_genome_data/Reference_genome/GCF_000004075.2_ASM407v2_genomic.gtf"
-  },
-  "rnaseq.reference_level": "Control",
-  "rnaseq.contrast": "condition,CD6,Control",
-  "rnaseq.trim_quality": 20,
-  "rnaseq.trim_length": 20,
-  "rnaseq.star_cpu": 8,
-  "rnaseq.star_memory_gb": 64,
-  "rnaseq.genome_sa_index_nbases": 14,
-  "rnaseq.min_counts": 10,
-  "rnaseq.min_samples": 0,
-  "rnaseq.organize_results": true,
-  "rnaseq.include_bams": false,
-  "rnaseq.include_trimmed_fastqs": false
-}
-```
-
-Validate JSON syntax:
-
-```bash
-python3 -m json.tool inputs_cd6_vs_control.json
-```
-
----
-
-## 10. WDL validation
-
-Womtool and Cromwell 87 require Java 11. Java 8 produces a class-version error.
-
-Load Java 11:
-
-```bash
-module load java/11.0.2
-hash -r
-java -version
-```
-
-Validate the WDL:
-
-```bash
-java -jar ${BIN_ROOT}/womtool-87.jar \
-  validate \
-  ww-rnaseq.wdl
-```
-
-Validate the WDL with the input JSON:
-
-```bash
-java -jar ${BIN_ROOT}/womtool-87.jar \
-  validate \
-  ww-rnaseq.wdl \
-  --inputs inputs_cd6_vs_control.json
-```
-
-Expected result:
-
-```text
-Success!
-```
-
-Cromwell 87 does not provide a `validate` subcommand. Use Womtool for validation.
-
----
-
-## 11. Cromwell SLURM configuration
-
-The active `slurm.conf` submits each WDL task as a separate SLURM job. It uses `--parsable` so Cromwell receives a numeric SLURM job ID directly.
-
-```hocon
-include classpath("application")
-
-backend {
-  default = "SLURM"
-
-  providers {
-    SLURM {
-      actor-factory = "cromwell.backend.impl.sfs.config.ConfigBackendLifecycleActorFactory"
-
-      config {
-        concurrent-job-limit = 10
-
-        runtime-attributes = """
-        Int cpu = 8
-        Int memory_gb = 64
-        String partition = "general"
-        """
-
-        submit = """
-          /usr/bin/sbatch --parsable \
-            -J \${job_name} \
-            -D \${cwd} \
-            -o \${out} \
-            -e \${err} \
-            -t 24:00:00 \
-            --partition=\${partition} \
-            --cpus-per-task=\${cpu} \
-            --mem=\${memory_gb}G \
-            --wrap "source /etc/profile.d/modules.sh 2>/dev/null || true; module load fastqc/0.11.5 star/2.7.3a subread/2.0.5 samtools/1.21 cutadapt/2.1 bedtools/2.27.1; source /path_to_folder/miniconda/etc/profile.d/conda.sh; conda activate rnaseq_r; unset R_HOME R_LIBS_USER R_LIBS PYTHONHOME PYTHONPATH; export PATH=/path_to_folder/miniconda/envs/multiqc_env/bin:/path_to_folder/miniconda/envs/rnaseq_r/bin:/path_to_folder/bin:\$PATH; exec /bin/bash \${script}"
-        """
-
-        kill = "scancel ${job_id}"
-        check-alive = "squeue -j ${job_id}"
-        job-id-regex = "(\\d+)"
-      }
-    }
-  }
-}
-```
-
-Important configuration details:
-
-- Do not use `--wait` in the Cromwell `submit` command.
-- Use `/usr/bin/sbatch --parsable`.
-- Use `job-id-regex = "(\\d+)"`.
-- Do not load system R 3.6.1 or R 4.6.0 for child tasks.
-- Activate `rnaseq_r` so R 4.5.3 and DESeq2 1.50.2 are used.
-- Modern RSeQC 5.0.5 and MultiQC 1.35 come from `multiqc_env`; do not load the obsolete Python 2 `RSeQC/2.6.3` module.
-- Keep the escaped Cromwell variables inside the triple-quoted HOCON `submit` template exactly as shown.
-- Do not run `${script}` directly in an interactive shell; Cromwell provides that value when it creates a task.
-
----
-
-## 12. Cromwell master submission script
-
-The master Cromwell process itself runs as a small SLURM job. It does not need to activate the RNA-Seq R environment; child tasks activate `rnaseq_r` through `slurm.conf`.
-
-```bash
-#!/bin/bash
-#SBATCH --job-name=Cromwell_Master
-#SBATCH --partition=general
-#SBATCH --nodes=1
-#SBATCH --ntasks=1
-#SBATCH --cpus-per-task=2
-#SBATCH --mem=8G
-#SBATCH --time=48:00:00
-#SBATCH --output=cromwell_master_%j.log
-
-set -euo pipefail
-
-source /etc/profile.d/modules.sh 2>/dev/null || true
-module load java/11.0.2
-
-cd ${PROJECT_ROOT}
-
-java \
-  -Dconfig.file=${PROJECT_ROOT}/slurm.conf \
-  -jar ${BIN_ROOT}/cromwell-87.jar \
-  run \
-  ${PROJECT_ROOT}/ww-rnaseq.wdl \
-  --inputs ${PROJECT_ROOT}/inputs_cd6_vs_control.json
-```
-
-Submit:
-
-```bash
-cd ${PROJECT_ROOT}
-sbatch submit_pipeline.sh
-```
-
----
-
-## 13. Monitor a run
-
-Find active jobs:
-
-```bash
-squeue -u "$USER" \
-  -o "%.18i %.12P %.30j %.8T %.10M %.10l %.20R"
-```
-
-Typical output includes:
-
-- One `Cromwell_Master` job
-- Multiple `cromwell_*` child jobs
-- FastQC and Trim Galore jobs running in parallel
-- Later STAR and RSeQC jobs
-
-Follow the master log using the actual master job ID:
-
-```bash
-tail -f cromwell_master_1229509.log
-```
-
-Replace `1229509` with the actual ID. Do not type a placeholder such as `<NEW_JOB_ID>` literally.
-
-Stop viewing the log with `Ctrl+C`; this does not stop the SLURM job.
-
-Search for task errors:
-
-```bash
-grep -nEi \
-  'error|failed|failure|exception|command not found|out.of.memory|oom' \
-  cromwell_master_<MASTER_JOB_ID>.log | tail -n 50
-```
-
-Find the execution directories:
-
-```bash
-find cromwell-executions/rnaseq -maxdepth 1 -mindepth 1 -type d \
-  -printf '%f\n' | sort | tail -n 10
-```
-
-For a known workflow UUID:
-
-```bash
-RUN="cromwell-executions/rnaseq/<WORKFLOW_UUID>"
-
-find "$RUN" -type f -name rc -print0 |
-while IFS= read -r -d '' f
- do
-    printf '%s: ' "$f"
-    cat "$f"
-done
-```
-
-Return-code interpretation:
-
-| Return code | Meaning |
-|---:|---|
-| `0` | Task succeeded |
-| `127` | Executable not found |
-| `137` | Often out-of-memory or killed task |
-| Other nonzero value | Tool- or task-specific failure |
-
----
-
-## 14. Expected outputs
+### Expected output categories
 
 The workflow should produce outputs corresponding to the following categories.
 
@@ -873,7 +1042,63 @@ find cromwell-executions -type f \
 
 ---
 
-## 15. How to interpret the expected results
+### Successful run and exact output locations
+
+The first complete successful run in this project was:
+
+```text
+Master SLURM job: 1231215
+Workflow UUID:    d94bf175-9ca9-46b7-94e1-5080aa202420
+Final status:     Succeeded
+```
+
+Set the run root as follows:
+
+```bash
+export RUN_ROOT="${PROJECT_ROOT}/cromwell-executions/rnaseq/d94bf175-9ca9-46b7-94e1-5080aa202420"
+```
+
+The most useful direct outputs are:
+
+| File | Location relative to `${RUN_ROOT}` | Purpose |
+|---|---|---|
+| Combined counts | `call-step06_combine_counts/execution/combined_counts_matrix.txt` | Raw gene-count matrix for all samples |
+| Sample metadata | `call-step06_combine_counts/execution/sample_metadata.txt` | Conditions used by DESeq2 |
+| All DESeq2 results | `call-step07_deseq2/execution/deseq2_results_all_genes.csv` | Complete differential-expression table |
+| Significant DESeq2 results | `call-step07_deseq2/execution/deseq2_results_significant.csv` | Filtered significant results |
+| Normalized counts | `call-step07_deseq2/execution/deseq2_results_normalized_counts.csv` | DESeq2-normalized expression matrix |
+| Shrunken results | `call-step07_deseq2/execution/deseq2_results_all_genes_shrunk.csv` | Results with shrunken LFC when enabled |
+| PCA | `call-step07_deseq2/execution/deseq2_results_pca.pdf` | Sample-level expression structure |
+| Volcano plot | `call-step07_deseq2/execution/deseq2_results_volcano.pdf` | Effect size versus significance |
+| Heatmap | `call-step07_deseq2/execution/deseq2_results_heatmap.pdf` | Expression patterns for selected genes |
+| MA plot | `call-step07_deseq2/execution/deseq2_results_ma_plot.pdf` | Mean expression versus fold change |
+| Shrunken MA plot | `call-step07_deseq2/execution/deseq2_results_ma_plot_shrunk.pdf` | MA plot using shrunken fold changes |
+| Compiled results | `call-step08_compile_results/execution/deseq2_compiled_results.csv` | DESeq2 statistics, normalized counts, and available annotations |
+| MultiQC report | `call-step09_multiqc/execution/multiqc_output/multiqc_report.html` | Interactive QC report |
+| MultiQC data | `call-step09_multiqc/execution/multiqc_output/multiqc_report_data.zip` | MultiQC source data |
+
+The organized copies, when `step10_organize_outputs` is enabled, are easiest to deliver:
+
+```text
+${RUN_ROOT}/call-step10_organize_outputs/execution/rnaseq_results/
+```
+
+The organized DESeq2 and MultiQC files include:
+
+```text
+rnaseq_results/06-deseq2/deseq2_compiled_results.csv
+rnaseq_results/07-multiqc/multiqc_report.html
+```
+
+Use `find` to inspect every output without guessing the Cromwell call directory:
+
+```bash
+find "$RUN_ROOT" -type f | sort
+```
+
+---
+
+## Interpreting results
 
 ### FastQC and MultiQC
 
@@ -987,7 +1212,7 @@ Before biological interpretation, check:
 
 ---
 
-## 16. Experimental design notes
+## Experimental design notes
 
 The current design assumes the six libraries are independent biological replicates and there is no known batch effect.
 
@@ -1009,7 +1234,7 @@ With three biological replicates per group, DESeq2 can estimate dispersion and p
 
 ---
 
-## 17. Troubleshooting guide
+## Troubleshooting
 
 ### Java class-version error
 
@@ -1175,7 +1400,7 @@ Workflow ... transitioned to state Failed
 
 ---
 
-## 18. Reusable preflight check
+## Reusable preflight check
 
 Run this before every new workflow submission. It is intended to fail early if a command, package, reference file, or sample input is unavailable on the compute node.
 
@@ -1253,7 +1478,7 @@ The preflight deliberately uses modern RSeQC from `multiqc_env`. Do not add the 
 
 ---
 
-## 19. Future runs: change samples without repeating debugging
+## Future runs
 
 For the same species, reference assembly, experimental design, and software installation:
 
@@ -1278,63 +1503,7 @@ A new run will create a new UUID under `cromwell-executions/rnaseq/`. Cromwell d
 
 ---
 
-## 20. Successful run and exact output locations
-
-The first complete successful run in this project was:
-
-```text
-Master SLURM job: 1231215
-Workflow UUID:    d94bf175-9ca9-46b7-94e1-5080aa202420
-Final status:     Succeeded
-```
-
-Set the run root as follows:
-
-```bash
-export RUN_ROOT="${PROJECT_ROOT}/cromwell-executions/rnaseq/d94bf175-9ca9-46b7-94e1-5080aa202420"
-```
-
-The most useful direct outputs are:
-
-| File | Location relative to `${RUN_ROOT}` | Purpose |
-|---|---|---|
-| Combined counts | `call-step06_combine_counts/execution/combined_counts_matrix.txt` | Raw gene-count matrix for all samples |
-| Sample metadata | `call-step06_combine_counts/execution/sample_metadata.txt` | Conditions used by DESeq2 |
-| All DESeq2 results | `call-step07_deseq2/execution/deseq2_results_all_genes.csv` | Complete differential-expression table |
-| Significant DESeq2 results | `call-step07_deseq2/execution/deseq2_results_significant.csv` | Filtered significant results |
-| Normalized counts | `call-step07_deseq2/execution/deseq2_results_normalized_counts.csv` | DESeq2-normalized expression matrix |
-| Shrunken results | `call-step07_deseq2/execution/deseq2_results_all_genes_shrunk.csv` | Results with shrunken LFC when enabled |
-| PCA | `call-step07_deseq2/execution/deseq2_results_pca.pdf` | Sample-level expression structure |
-| Volcano plot | `call-step07_deseq2/execution/deseq2_results_volcano.pdf` | Effect size versus significance |
-| Heatmap | `call-step07_deseq2/execution/deseq2_results_heatmap.pdf` | Expression patterns for selected genes |
-| MA plot | `call-step07_deseq2/execution/deseq2_results_ma_plot.pdf` | Mean expression versus fold change |
-| Shrunken MA plot | `call-step07_deseq2/execution/deseq2_results_ma_plot_shrunk.pdf` | MA plot using shrunken fold changes |
-| Compiled results | `call-step08_compile_results/execution/deseq2_compiled_results.csv` | DESeq2 statistics, normalized counts, and available annotations |
-| MultiQC report | `call-step09_multiqc/execution/multiqc_output/multiqc_report.html` | Interactive QC report |
-| MultiQC data | `call-step09_multiqc/execution/multiqc_output/multiqc_report_data.zip` | MultiQC source data |
-
-The organized copies, when `step10_organize_outputs` is enabled, are easiest to deliver:
-
-```text
-${RUN_ROOT}/call-step10_organize_outputs/execution/rnaseq_results/
-```
-
-The organized DESeq2 and MultiQC files include:
-
-```text
-rnaseq_results/06-deseq2/deseq2_compiled_results.csv
-rnaseq_results/07-multiqc/multiqc_report.html
-```
-
-Use `find` to inspect every output without guessing the Cromwell call directory:
-
-```bash
-find "$RUN_ROOT" -type f | sort
-```
-
----
-
-## 21. Copy outputs into one folder and create an archive
+## Packaging and archiving results
 
 Yes. Keep the Cromwell execution tree as the provenance record, then create a separate compact delivery directory. This avoids moving files while Cromwell is running and avoids duplicating large intermediate files unnecessarily.
 
@@ -1386,7 +1555,7 @@ For routine reporting, the compact folder above is usually sufficient. Retain th
 
 ---
 
-## 22. Completion checklist
+## Completion checklist
 
 The run is complete only when all of the following are true:
 
