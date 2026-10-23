@@ -72,7 +72,7 @@ The workflow is executed with [`ww-rnaseq.wdl`](https://github.com/HABIOTECH/wil
 
 ## Project objectives
 
-The objective is to compare gene expression between CD6-treated and untreated control shoots using six paired-end RNA-seq libraries, with DESeq2 configured for the `CD6 - Control` contrast and a `~ condition` design.
+The objective is to perform differential gene expression analysis between cadmium CD6-treated and untreated control shoots in cucumber plants using six paired-end RNA-seq libraries, with DESeq2 configured for the `CD6 - Control` contrast and a `~ condition` design.
 
 The WDL workflow source is maintained in the [WILDS WDL library RNA-seq pipeline](https://github.com/HABIOTECH/wilds-wdl-library/tree/main/pipelines/ww-rnaseq). This repository also contains the standalone DESeq2 analysis script and selected input data, QC reports, result tables, and figures. Confirm that all external workflow files and environment-specific configuration are available before attempting a fresh end-to-end run.
 
