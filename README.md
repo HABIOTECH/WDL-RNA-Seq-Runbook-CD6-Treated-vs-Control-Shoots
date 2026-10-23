@@ -19,18 +19,6 @@ Horizon Science Communication LLC — Bioinformatics Team:
 - **Alaa El-minisy, PhD**
 
 
-
-## Key Results
-
-Multi-panel overview of the CD6-treated versus control *Cucumis sativus* RNA-seq results
-
-<p align="center">
-  <img src="rnaseq_results_figure.png" alt="RNA-seq results: CD6-treated vs control shoots" width="900">
-</p>
-<p align="center"><em>Figure 1. Summary of DESeq2 results for CD6-treated vs control shoots.</em></p>
-
-Figure 1. Sample-level and differential-expression summaries for three CD6-treated and three control cucumber-shoot samples. Panels show principal component analysis, the expression heatmap, the differential-expression volcano plot, and the unshrunken MA plot. See the accompanying methods and result tables for analysis details and gene-level estimates.
-
 ## Table of contents
 
 - [Project overview](#project-overview)
@@ -309,6 +297,18 @@ The committed analysis outputs include the differential-expression tables and fo
 | MultiQC report | [`multiqc_report.html`](qc/multiqc_report.html) |
 
 The committed standalone DESeq2 run retained 18,222 genes after filtering and reported 8,024 genes with adjusted p-value below 0.05. These values should be interpreted only after confirming the organism/reference identity, sample-level QC, replicate relationships, and the assumptions described later in this README.
+
+## Key Results
+
+Multi-panel overview of the CD6-treated versus control *Cucumis sativus* RNA-seq results
+
+<p align="center">
+  <img src="rnaseq_results_figure.png" alt="RNA-seq results: CD6-treated vs control shoots" width="900">
+</p>
+<p align="center"><em>Figure 1. Summary of DESeq2 results for CD6-treated vs control shoots.</em></p>
+
+Figure 1. Sample-level and differential-expression summaries for three CD6-treated and three control cucumber-shoot samples. Panels show principal component analysis, the expression heatmap, the differential-expression volcano plot, and the unshrunken MA plot. See the accompanying methods and result tables for analysis details and gene-level estimates.
+
 
 ## Software environment
 
