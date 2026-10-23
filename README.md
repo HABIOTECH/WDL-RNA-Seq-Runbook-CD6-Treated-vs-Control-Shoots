@@ -13,6 +13,13 @@ Horizon Science Communication LLC — Bioinformatics Team:
 - **Hesham Abdullah, PhD**
 - **Alaa El-minisy, PhD**
 
+
+Multi-panel overview of the CD6-treated versus control *Cucumis sativus* RNA-seq results
+
+
+
+Figure 1. Sample-level and differential-expression summaries for three CD6-treated and three control cucumber-shoot samples. Panels show principal component analysis, the expression heatmap, the differential-expression volcano plot, and the unshrunken MA plot. See the accompanying methods and result tables for analysis details and gene-level estimates.
+
 ## Table of contents
 
 - [Project overview](#project-overview)
