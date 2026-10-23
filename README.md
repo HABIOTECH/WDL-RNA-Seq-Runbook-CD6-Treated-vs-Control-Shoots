@@ -821,6 +821,19 @@ Post-trim FastQC HTML reports
 Post-trim FastQC ZIP archives
 ```
 
+
+## Quality Control (MultiQC)
+
+<p align="center">
+  <a href="https://habiotech.github.io/WDL-RNA-Seq-Runbook-CD6-Treated-vs-Control-Shoots/qc/multiqc_report.html"><b>📊 Open the interactive MultiQC report</b></a>
+  &nbsp;·&nbsp;
+  <a href="qc/multiqc_report.html">View HTML file</a>
+  &nbsp;·&nbsp;
+  <a href="qc/multiqc_report_data.zip">Download MultiQC data (.zip)</a>
+</p>
+
+
+
 ### Step 5: STAR genome-index construction
 
 Task/call: `build_index`
