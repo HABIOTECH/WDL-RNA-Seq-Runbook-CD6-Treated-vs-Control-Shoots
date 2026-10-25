@@ -17,6 +17,7 @@ Horizon Science Communication LLC — Bioinformatics Team:
 
 - **Hesham Abdullah, PhD**
 - **Alaa El-minisy, PhD**
+- **Mohamed Elsisi**
 
 
 ## Table of contents
